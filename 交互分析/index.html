@@ -1,0 +1,155 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Emotion Detection</title>
+    <style>
+		.container {
+		display: flex;
+		width: 100%;
+		height: 100vh;
+		}
+		.container1 {
+		flex: 1; /* 占据 2/3 的宽度 */
+		padding: 20px;
+		}	
+		.container2{
+		flex: 1; /* 占据 2/3 的宽度 */
+		padding: 20px;
+		}	
+		.container3 {
+		flex: 1; /* 占据 2/3 的宽度 */
+		padding: 20px;
+		}			
+		
+        video, canvas {
+            display: block;
+            margin: 10px auto;
+        }
+        #emotion-results {
+            text-align: center;
+            margin-top: 20px;
+        }
+		#results {
+		width: 100%;
+		height: 400px; /* 设置固定高度 */
+		overflow-y: auto; /* 使内容垂直滚动 */
+		border: 1px solid #ccc;
+		padding: 10px;
+		background-color: #f9f9f9;
+		}
+    </style>
+	
+</head>
+<body>
+    <h1 style="text-align: center;">WebSocket Real-Time Emotion Detection</h1>
+<div class="container">
+<div class="container1">
+    <video id="video" width="640" height="480" autoplay></video>
+    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+
+
+    <div id="emotion-results">
+        <h2>Emotion Results</h2>
+        <div id="results"></div>
+    </div>
+<!-- This is a single line comment -->
+	<div id="app">
+    <div ref="emotionChart" style="width: 100%; height: 400px;"></div>
+	</div>	
+
+	
+	
+</div>
+<div class="container2">
+
+</div>
+
+<div class="container3">
+
+</div>
+</div>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const resultsDiv = document.getElementById('results');
+
+        let socket = null;
+        let isAnalyzing = false;
+
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+                initializeWebSocket();
+            })
+            .catch((err) => {
+                console.error("Error accessing webcam: ", err);
+            });
+
+
+        function initializeWebSocket() {
+            socket = new WebSocket('ws://localhost:5000');
+
+            socket.onopen = () => {
+                console.log("WebSocket connection established");
+
+
+                setInterval(() => {
+                    if (!isAnalyzing) {
+                        captureAndSendFrame();
+                    }
+                }, 1000);
+            };
+
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                displayResults(data);
+                isAnalyzing = false;
+            };
+
+            socket.onerror = (error) => {
+                console.error("WebSocket Error: ", error);
+            };
+
+            socket.onclose = () => {
+                console.log("WebSocket connection closed");
+            };
+        }
+
+
+        function captureAndSendFrame() {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+
+            const frameBase64 = canvas.toDataURL('image/jpeg');
+
+
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                isAnalyzing = true;
+                socket.send(frameBase64);
+            }
+        }
+
+
+        function displayResults(data) {
+            const timestamp = data.timestamp;
+            const dominantEmotion = data.dominant_emotion;
+            const emotions = data.emotions;
+
+
+            const resultHTML = `
+                <p><strong>Timestamp:</strong> ${timestamp}</p>
+                <p><strong>Dominant Emotion:</strong> ${dominantEmotion}</p>
+                <p><strong>Emotion Details:</strong> ${JSON.stringify(emotions)}</p>
+                <hr/>
+            `;
+            resultsDiv.innerHTML = resultHTML + resultsDiv.innerHTML;
+        }
+    </script>
+</body>
+</html>
